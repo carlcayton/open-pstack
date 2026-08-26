@@ -2,7 +2,7 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
-## Unreleased — selectable requested effort in setup-pstack
+## 1.1.0 adds selectable requested effort to setup-pstack
 
 `setup-pstack` asks one requested effort per frontier family (`low`, `medium`, `high`, `xhigh`, `max`) instead of probing a fixed default quartet. `provider-dispatch.md` owns the model matrix: family, upstream choice, provider, model, first-run default effort, selectable efforts, and Claude-native agent stem. Setup loads the current sheet first, folds mixed per-family efforts with an explicit operator choice, probes only the four requested pairs, and writes nothing on a failed probe. A rerun rewrites that family's `@effort` suffix on every assigned role and leaves customized role-to-family lanes in place. First-run defaults remain Fable `max`, Sol `max`, Grok `xhigh`, and Opus `xhigh`.
 
