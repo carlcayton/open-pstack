@@ -25,12 +25,28 @@ const FAMILY_ORDER = ["fable", "sol", "grok", "opus"] as const;
 const PROVIDERS = ["claude", "codex", "grok"] as const;
 const DESCRIPTOR_RE =
   /(claude|codex|grok):[a-z0-9.-]+@(low|medium|high|xhigh|max)/g;
-const FIRST_RUN_PANEL_COPY =
-  "Use Fable 5 at max, GPT-5.6 Sol at max, Grok 4.6 at xhigh, and Opus 5 at xhigh for the multi-model panels, with the upstream single-role assignments below?";
 const PANEL_ROLES = [
   "how critics",
   "arena runners",
   "arena cross-judge pool",
+  "architect runners",
+  "interrogate reviewers",
+] as const;
+const SHEET_ROLES = [
+  "feature, refactoring",
+  "bug-fix",
+  "perf-issue",
+  "hillclimb",
+  "judgment and prose",
+  "hardest tasks",
+  "how explorer",
+  "how explainer",
+  "how critics",
+  "why investigators, synthesizer",
+  "reflect tooling, judgment, divergent, synthesizer",
+  "arena runners",
+  "arena cross-judge pool",
+  "swarm workers",
   "architect runners",
   "interrogate reviewers",
 ] as const;
@@ -191,17 +207,14 @@ describe("model matrix", () => {
   it("owns the effort universe and first-run defaults", () => {
     expect([...EFFORTS]).toEqual(["low", "medium", "high", "xhigh", "max"]);
     expect(rows.map((row) => row.family)).toEqual([...FAMILY_ORDER]);
-    const seen = new Set<Effort>();
     for (const row of rows) {
       expect(row.upstreamChoice.length).toBeGreaterThan(0);
       expect(row.model.length).toBeGreaterThan(0);
-      expect(row.selectableEfforts).toEqual([...EFFORTS]);
-      for (const effort of row.selectableEfforts) {
-        seen.add(effort);
-      }
+      expect(row.selectableEfforts.length).toBeGreaterThan(0);
+      expect(row.selectableEfforts).toEqual(
+        EFFORTS.filter((effort) => row.selectableEfforts.includes(effort))
+      );
     }
-    expect(seen.size).toBe(EFFORTS.length);
-    expect([...EFFORTS].every((effort) => seen.has(effort))).toBe(true);
     expect(
       rows.map((row) => [row.family, row.defaultEffort])
     ).toEqual([
@@ -241,7 +254,15 @@ describe("model matrix", () => {
         }
       }
     }
-    expect(expected.size).toBe(10);
+    const declaredCount = rows.reduce(
+      (count, row) =>
+        count +
+        (row.claudeNativeAgentStem === null
+          ? 0
+          : row.selectableEfforts.length),
+      0
+    );
+    expect(expected.size).toBe(declaredCount);
     const shipped = readdirSync(AGENTS_DIR)
       .filter((name) => name.startsWith("pstack-") && name.endsWith(".md"))
       .sort();
@@ -249,8 +270,12 @@ describe("model matrix", () => {
   });
 
   it("keeps setup's first-run default panel copy aligned with the matrix", () => {
-    expect(setup).toContain(FIRST_RUN_PANEL_COPY);
     const sheet = firstRunSheet(setup);
+    const roles = sheet
+      .split("\n")
+      .filter((line) => line.includes(": "))
+      .map((line) => line.slice(0, line.indexOf(": ")));
+    expect(roles).toEqual([...SHEET_ROLES]);
     const byFamily = new Map<string, MatrixRow>(
       rows.map((row) => [`${row.provider}:${row.model}`, row])
     );
@@ -284,8 +309,26 @@ describe("model matrix", () => {
       previous = current;
     }
     expect(setup).toContain("Do not invent a precedence rule.");
-    expect(setup).toContain("Do not probe or write while the mix is unresolved.");
+    expect(setup).toContain("Do not probe or write while any inconsistency is unresolved.");
     expect(setup).toContain("A failed probe writes nothing:");
+    expect(setup).toContain("Run one probe per family");
+    expect(setup).toContain("normalized complete role map from step 2");
+    expect(setup).toContain("Every documented role remains present.");
     expect(setup).toContain("An effort-only rerun cannot change a role's family.");
+    expect(setup).toContain("<!-- pstack:models:begin -->");
+    expect(setup).toContain("<!-- pstack:models:end -->");
+  });
+
+  it("binds Claude-native dispatch to the matrix mapping", () => {
+    const dispatch = readFileSync(DISPATCH_PATH, "utf8");
+    const nativeStart = dispatch.indexOf("## Native lanes");
+    const externalStart = dispatch.indexOf("## External lanes");
+    expect(nativeStart).toBeGreaterThan(-1);
+    expect(externalStart).toBeGreaterThan(nativeStart);
+    const nativeLanes = dispatch.slice(nativeStart, externalStart);
+    expect(nativeLanes).toContain(
+      "match the descriptor's `(provider, model)` to one model-matrix row"
+    );
+    expect(nativeLanes).toContain("`pstack-<stem>-<effort>`");
   });
 });

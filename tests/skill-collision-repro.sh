@@ -65,7 +65,7 @@ canon_quad="$(awk '
       gsub(/`/, "", cells[i])
     }
     family = cells[1]
-    if (family == "Family" || family ~ /^-/) next
+    if (family == "Family" || family ~ /^:?-+:?$/) next
     provider = cells[3]
     model = cells[4]
     effort = cells[5]
